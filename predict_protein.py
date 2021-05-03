@@ -3,6 +3,15 @@
 Created on Wed Mar 01 12:49:45 2021
 
 @author: zhuravleva_ro
+
+Быстрый вывод приложения для тестирования модели Сделаны две модели предсказание
+потребности протеина на две и четыре недели вперед. Для быстрого тестирования
+сделала веб приложение на Dash. Параметры модели обображаются в таблице,
+которую можно править и изменять условия для предсказания. По нажадию кнопки
+происходит предсказание двух величин, на 2 и 4 недели вперед. После этого
+показывается обновленный график с предсказаниями. Для удобства сделан инструмент
+загрузки параметров из отчетного экселя.
+
 """
 import base64
 import io
@@ -36,7 +45,7 @@ engine = create_engine(connection_string)
 def get_fig():
     # make figure
     # Беру последние 20 предсказаний и строю по ним график
-    query = """SELECT TOP(20) * FROM [DEV052].[dbo].[preduction_birga]
+    query = """SELECT TOP(20) * FROM [DEV052].[dbo].[preduction_protein]
       ORDER BY time DESC"""
     df_fig = pd.read_sql(query, con=engine)
     fig = px.scatter(df_fig, x="time_for_predict", y="Linear_predict_4_week", text='comment')
@@ -66,23 +75,24 @@ def get_dic():
 
 
 def get_start_data(col_all):
+    """
+    Загрузка последних данных из базы для отображения начальной страницы
+    """
     query = """
     SELECT TOP(1) *
-      FROM [DEV052].[dbo].[preduction_birga]
+      FROM [DEV052].[dbo].[preduction_protein]
       ORDER BY time DESC """
     df = pd.read_sql(query, con=engine)
     # print(df.time)
     df['time_for_predict'] = df['time_for_predict'].dt.strftime("%d-%m-%Y %H:%M")
     df['time'] = df['time'].dt.strftime("%d-%m-%Y %H:%M")
     dic = get_dic()
-
-    # print(df.columns)
-    # print(dic)
-
     table_ = [{'eng_name': dic[col_], 'name': col_, 'value': df[col_].values[0]} for col_ in col_all]
     return table_
 
-
+"""
+MAIN PART OF PAGE
+"""
 external_stylesheets = ['https://cdn.jsdelivr.net/npm/bootswatch@4.5.2/dist/cerulean/bootstrap.min.css']
 
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
@@ -99,10 +109,10 @@ app.layout = html.Div([  # big block
             , style_data_conditional=[{'if': {'column_id': ['eng_name', 'name', 'value'], "row_index": num},
                                        'backgroundColor': color,
                                        'color': 'black'}
-                                      for num in range(0, len(col_all)) if col_all[num] in col_linear]
+                                       for num in range(0, len(col_all)) if col_all[num] in col_linear]
             , style_header={
-                'backgroundColor': backgroundColor,
-                'fontWeight': 'bold'}),
+                            'backgroundColor': backgroundColor,
+                            'fontWeight': 'bold'}),
         style={'width': '45%', 'display': 'inline-block'}),
     html.Div([
         html.Div(children=title),
@@ -161,6 +171,7 @@ def update_output(n_clicks, contents, data,filename):
                     if col_ in df_excel.name.values:
                         print(col_, df_excel[df_excel.name == col_]['value'].values[0])
                         df_.loc[col_, 'value'] = df_excel[df_excel.name == col_]['value'].values[0]
+
                 dic = get_dic()
                 df_ = df_[['value']].T
                 table_ = [{'eng_name': dic[col_], 'name': col_, 'value': df_[col_].values[0]} for col_ in col_all]
@@ -186,7 +197,7 @@ def update_output(n_clicks, contents, data,filename):
         df_['time_for_predict'] = (datetime.datetime.now() + datetime.timedelta(days=28))
         df_['time'] = datetime.datetime.now()
 
-        df_.to_sql('preduction_birga', con=engine, schema='[DEV052].[dbo]', if_exists='append', index=False)
+        df_.to_sql('preduction_protein', con=engine, schema='[DEV052].[dbo]', if_exists='append', index=False)
 
     return get_start_data(col_all), get_fig(), None
 
